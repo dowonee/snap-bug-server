@@ -32,11 +32,6 @@ SnapBug는 **React 애플리케이션**의 **상태 변화**와 **DOM**을 함�
   * [2. React 모든 상태를 빠짐없이 수집하려면 Fiber 트리를 전체 순회해야 했습니다.](#2-react-%EB%AA%A8%EB%93%A0-%EC%83%81%ED%83%9C%EB%A5%BC-%EB%B9%A0%EC%A7%90%EC%97%86%EC%9D%B4-%EC%88%98%EC%A7%91%ED%95%98%EB%A0%A4%EB%A9%B4-fiber-%ED%8A%B8%EB%A6%AC%EB%A5%BC-%EC%A0%84%EC%B2%B4-%EC%88%9C%ED%9A%8C%ED%95%B4%EC%95%BC-%ED%96%88%EC%8A%B5%EB%8B%88%EB%8B%A4)
   * [3. DOM이 바뀐 시점에만 저장되도록 최적화했습니다.](#3-dom%EC%9D%B4-%EB%B0%94%EB%80%90-%EC%8B%9C%EC%A0%90%EC%97%90%EB%A7%8C-%EC%A0%80%EC%9E%A5%EB%90%98%EB%8F%84%EB%A1%9D-%EC%B5%9C%EC%A0%81%ED%99%94%ED%96%88%EC%8A%B5%EB%8B%88%EB%8B%A4)
 - [User Experience](#user-experience)
-  * [1. 상태 추적 스크립트 삽입](#1-%EC%83%81%ED%83%9C-%EC%B6%94%EC%A0%81-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%82%BD%EC%9E%85)
-  * [2. 상태 및 UI 변화 저장](#2-%EC%83%81%ED%83%9C-%EB%B0%8F-ui-%EB%B3%80%ED%99%94-%EC%A0%80%EC%9E%A5)
-  * [3. 배포 및 UI 복원 화면](#3-%EB%B0%B0%ED%8F%AC-%EB%B0%8F-ui-%EB%B3%B5%EC%9B%90-%ED%99%94%EB%A9%B4)
-  * [4. 브라우저에서 상태 히스토리 확인](#4-%EB%B8%8C%EB%9D%BC%EC%9A%B0%EC%A0%80%EC%97%90%EC%84%9C-%EC%83%81%ED%83%9C-%ED%9E%88%EC%8A%A4%ED%86%A0%EB%A6%AC-%ED%99%95%EC%9D%B8)
-- [Tech stack](#tech-stack)
 - [Workflow](#workflow)
 - [Retrospective](#retrospective)
 
@@ -90,9 +85,27 @@ SnapBug는 **React 애플리케이션**의 **상태 변화**와 **DOM**을 함�
 
 # System Architecture
 
-SnapBug는 다음과 같은 네 가지 구성 요소로 설계되었습니다.
+### 사용자의 React 앱에 상태 추적 및 DOM 변화 감지하는 SDK를 삽입합니다.
 
-![시스템아키텍처](./assets/시스템아키텍처.png)
+![시스템아키텍처1](./assets/시스템아키텍처1.png)
+
+사용자가 SDK를 자신의 React 앱에 삽입합니다.
+
+이 SDK는 React의 Fiber 트리를 탐색하며 상태 변화가 발생할 때마다 감지하여 스냅샷을 생성할 준비를 합니다. 사용자가 `snapbug start` 명령어를 실행하면 상태 추적을 시작합니다.
+
+### 상태 변화 감지 시 스냅샷을 API 서버로 전송합니다.
+
+![시스템아키텍처2](./assets/시스템아키텍처2.png)
+
+React 앱 내에서 상태 변화가 발생하면 SDK는 해당 시점의 상태 스냅샷을 생성해 API 서버로 전송합니다.
+각 스냅샷은 시간, 상태, DOM, CSS 등 복원에 필요한 정보를 포함하며 JSON 형태로 저장되어 Web Viewer에서 활용됩니다.
+
+### CLI로 상태를 조회하고 Web Viewer로 배포합니다.
+
+![시스템아키텍처3](./assets/시스템아키텍처3.png)
+
+개발자가 `snapbug run` 명령어를 실행하면 CLI는 API 서버로부터 스냅샷 데이터를 조회해 Web Viewer를 자동으로 배포합니다.
+Vercel API를 통해 고유한 preview URL이 생성되며 사용자는 이 주소를 통해 상태 복원 UI를 확인할 수 있습니다.
 
 ## SDK - 상태 추적 및 DOM 변화 감지
 
@@ -113,9 +126,7 @@ React와 Tailwind CSS 기반으로 구축되었으며 저장된 DOM과 CSS 정�
 React 앱과 SDK를 연동하고 수집된 상태 데이터를 기반으로 Web Viewer를 자동으로 빌드 및 배포하는 커맨드라인 도구입니다.<br>
 Commander.js 기반의 CLI 명령어 구조를 따르며 상태 추적 시작부터 배포된 Web Viewer 공유까지 전체 플로우를 자동화합니다.
 
-- `snapbug start`: React 앱에 SDK를 삽입하고 상태 추적을 시작합니다. 스냅샷은 JSON 형태로 저장되고 서버로 전송됩니다.
 
-- `snapbug run`: 수집된 데이터를 기반으로 Web Viewer를 자동 빌드하고 Vercel에 배포하여 공유 가능한 URL을 생성합니다.
 
 ## Server – 상태 스냅샷 수집 및 저장
 
@@ -124,6 +135,40 @@ SDK로부터 전달된 상태 변화 데이터를 수신하고 시간, 상태, D
 
 서버는 Express 기반의 RESTful API로 구성되어 있으며 스냅샷 저장 및 조회 기능을 제공합니다.
 CLI와 SDK는 이 서버를 통해 상태 히스토리를 주고받고  Web Viewer는 이를 바탕으로 시점별 UI와 상태를 복원합니다.
+
+## 기술 스택은 각 환경의 목적에 맞춰 선택했습니다.
+
+### SDK
+
+| 기술 스택 | 설명 |
+| -------- | ---- |
+| ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black) | React 애플리케이션 내부에서 상태 변화와 Fiber 트리를 추적하는 브라우저 실행 스크립트를 작성하는 데 사용된 언어 |
+| ![Vercel CDN](https://img.shields.io/badge/Vercel%20CDN-000000?logo=vercel&logoColor=white&style=flat-square) | React 내부 구조를 추적하기 위해 브라우저에 직접 삽입 가능한 스크립트를 전역 배포하는 데 사용된 CDN |
+
+### Web Viewer
+
+| 기술 스택 | 설명 |
+| -------- | ---- |
+| ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black) | Web Viewer 전반에 사용된 언어 |
+| ![React](https://img.shields.io/badge/React-61DAFB.svg?style=flat-square&logo=react&logoColor=white) | 시점별 상태를 시각적으로 탐색하고 복원하는 UI 컴포넌트 구성에 사용된 프론트엔드 프레임워크 |
+| ![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white) | 빠른 빌드와 모듈 교체(HMR)를 위한 번들러로, Viewer 초기 로딩 속도 개선에 기여 |
+| ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white) | 반응형 디자인과 빠른 UI 구성에 최적화된 유틸리티 기반 CSS 프레임워크로 뷰어 스타일 구현에 사용 |
+
+### CLI Tool
+
+| 기술 스택 | 설명 |
+| -------- | ---- |
+| ![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=nodedotjs&logoColor=white) | CLI 명령어 기반 기능 구현 및 파일 시스템 연동을 위한 런타임 환경 |
+| ![Commander.js](https://img.shields.io/badge/commander.js-000000?style=flat-square) | `snapbug start`, `snapbug run` 등 CLI 명령어 구성을 위한 경량 CLI 프레임워크 |
+| ![Vercel API](https://img.shields.io/badge/Vercel%20API-000000?logo=vercel&logoColor=white&style=flat-square) | 스냅샷 상태를 기반으로 Web Viewer를 자동 배포하는데 사용된 배포 자동화 API |
+
+### API 서버
+
+| 기술 스택 | 설명 |
+| -------- | ---- |
+| ![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=nodedotjs&logoColor=white) | 상태 저장, 조회 기능을 처리하는 API 서버 구현을 위한 런타임 환경 |
+| ![Express](https://img.shields.io/badge/Express.js-000000?style=flat-square&logo=express&logoColor=white) | JSON 기반 상태 데이터 파일을 관리하고 RESTful 방식으로 외부에 제공하는 웹 프레임워크 |
+| ![Railway](https://img.shields.io/badge/Railway-0B0D0E?style=flat-square&logo=railway&logoColor=white) | API 서버를 배포하기 위한 클라우드 플랫폼으로 자동 재배포 및 로그 추적 기능을 제공 |
 
 # Development
 
@@ -616,57 +661,6 @@ UI는 상태 히스토리를 블록 단위로 시각화하고, 각 시점의 UI�
 - **우측 화면에는 변화 당시** DOM과 CSS 스타일이 적용된 **UI가 재현**됩니다.
 
 DOM과 상태값을 포함한 변화 시점의 UI를 직관적으로 확인할 수 있으며, URL을 공유해 디버깅 상황을 팀원과 쉽게 공유할 수 있습니다.
-
-<br>
-
-# Tech stack
-
-## 개발 환경
-
-| 구분                      | 사용 기술                                                                                                                                                                                                                                                                                                                  |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **개발 언어**             | ![JavaScript](https://img.shields.io/badge/javascript-%23323330.svg?style=for-the-badge&logo=javascript&logoColor=23F7DF1E)                                                                                                                                                                                                |
-| **프레임워크/라이브러리** | ![React](https://img.shields.io/badge/React-61DAFB.svg?style=for-the-badge&logo=React&logoColor=white) ![Vite](https://img.shields.io/badge/vite-%23646CFF.svg?style=for-the-badge&logo=vite&logoColor=white) ![Express](https://img.shields.io/badge/express-000000.svg?style=for-the-badge&logo=express&logoColor=white) |
-| **스타일링**              | ![TailwindCSS](https://img.shields.io/badge/tailwindcss-61DAFB?style=for-the-badge&logo=tailwindcss&logoColor=white)                                                                                                                                                                                                       |
-| **개발 도구**             | ![ESLint](https://img.shields.io/badge/ESLint-FFD93E?style=for-the-badge&logo=eslint&logoColor=white) ![Prettier](https://img.shields.io/badge/Prettier-pink?style=for-the-badge&logo=prettier&logoColor=white) ![npm](https://img.shields.io/badge/npm-red?style=for-the-badge&logo=npm&logoColor=white)                  |
-| **배포 및 협업**          | ![Vercel](https://img.shields.io/badge/vercel-f0f0f0?style=for-the-badge&logo=vercel&logoColor=black) ![Git](https://img.shields.io/badge/git-%23F05033.svg?style=for-the-badge&logo=git&logoColor=white) ![GitHub](https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white)     |
-
-## 1. 프론트엔드 - React + Vite
-
-SnapBug의 핵심은 버튼 클릭 시점마다 상태를 기록하고 UI를 스냅샷처럼 보여주는 구조이기에 CSR(Client Side Rendering) 기반의 빠른 렌더링이 중요했습니다.
-
-- Vite는 변경된 모듈만 빠르게 교체해 빠른 개발 경험 제공
-- React 상태 기록과 CSR에 최적화
-
-## 2. CLI - commander.js
-
-SnapBug는 `snapbug start`, `snapbug end` 등의 CLI 명령어를 통해 상태 기록을 자동화합니다. 이 도구를 만들기 위해 간결한 구문과 학습 난이도가 낮은 CLI 프레임워크가 필요했습니다.
-
-- Yargs, Caporal과 비교해도 사용법이 간단하고 커뮤니티가 활발
-- 작은 프로젝트에서 빠르게 CLI 명령어 구성 가능
-
-## 3. 브라우저 접근 - CDN
-
-초기에는 React 상태를 추적하기 위해 Puppeteer를 사용했습니다. 그러나 다음과 같은 한계를 겪었습니다.
-
-- FiberNode는 브라우저 메모리에만 존재해 Puppeteer로 접근 불가
-- CSR 앱의 렌더링 타이밍을 정확히 맞추기 어려움
-- CORS 문제로 상태 전송 실패
-
-브라우저 내부에서 직접 실행되는 CDN 스크립트를 삽입해 FiberNode에 접근하고, API 서버로 상태를 직접 전송할 수 있도록 구조를 변경했습니다.
-
-## 4. 배포 - Vercel
-
-SnapBug는 사용자가 기록한 상태 스냅샷을 웹에서 바로 확인하고 공유할 수 있는 경험을 제공해야 했습니다. 이를 위해 배포 도구 선택 시 다음 기준을 우선적으로 고려했습니다.
-
-- 고유한 Preview URL 생성 가능 여부
-- 배포 속도
-- 간편한 배포 삭제
-
-Vercel은 배포 시마다 고유 Preview URL을 제공해 상태 공유가 간편했습니다. 또한
-인천에 Gateway가 위치해 있어 국내 배포 속도가 빠릅니다.
-CLI를 통한 자동 배포 및 삭제가 간편하게 가능했습니다.
-Netlify, AWS Amplify도 고려했지만, 속도 및 자동화 측면에서 Vercel이 가장 적합하다고 판단했습니다.
 
 <br>
 
