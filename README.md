@@ -85,7 +85,7 @@ SnapBug는 **React 애플리케이션**의 **상태 변화**와 **DOM**을 함�
 
 # System Architecture
 
-
+![시스템아키텍처](./assets/시스템아키텍처.png)
 
 ### 사용자의 React 앱에 상태 추적 및 DOM 변화 감지하는 SDK를 삽입합니다.
 
