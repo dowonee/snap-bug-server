@@ -12,6 +12,10 @@ app.use(cors({ origin: "*" }));
 app.use("/states", snapshotRouter);
 app.get("/health", (_, res) => res.status(httpStatusCode.OK).send("OK"));
 
+app.get("/", (req, res) => {
+  res.status(httpStatusCode.OK).json({ message: "Server is running" });
+});
+
 app.use((req, res, next) => {
   next(createError(httpStatusCode.NOT_FOUND));
 });
